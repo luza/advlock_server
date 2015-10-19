@@ -3,7 +3,6 @@
 import socket
 import select
 import datetime
-import logging
 import sys
 
 class KeysStorage:
@@ -40,6 +39,9 @@ class Connection:
         self.method = 'set_key'
 
     def set_key(self, key):
+        if not key:
+            self.write_reply(002, 'Empty key')
+            raise TerminateConnectionException()
         value = self.storage.get(key)
         if value:
             self.write_reply(001, 'Resource already acquired by %s at %s' % (value['client_ip'],
@@ -112,7 +114,7 @@ class Server:
         for client_socket in rlist:
             try:
                 self.process_reading_event(client_socket)
-            except TerminateConnectionException:
+            except (TerminateConnectionException, socket.error):
                 client_socket.close()
                 del self.connection_objects[client_socket]
 
