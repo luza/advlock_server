@@ -29,34 +29,53 @@ class Connection:
         self.method = 'set_version'
         self.storage = storage
         self.version = ''
-        self.key = ''
+        self.locks = []
+        self.commands = {
+            'set': self.set_lock,
+            'del': self.del_lock
+        }
 
     def write_reply(self, code, message):
         self.write('%03d,%s\n' % (code, message))
 
     def set_version(self, version):
         self.version = version
-        self.method = 'set_key'
+        self.method = 'set_or_del_lock'
 
-    def set_key(self, key):
+    def set_or_del_lock(self, command):
+        cmd, sep, key = command.partition(' ')
+        if cmd in self.commands:
+            self.commands[cmd](key)
+        else:
+            self.write_reply(003, 'Unknown command')
+
+    def set_lock(self, key):
         if not key:
-            self.write_reply(002, 'Empty key')
-            raise TerminateConnectionException()
+            self.write_reply(002, 'Empty resource key')
+            return
         value = self.storage.get(key)
         if value:
             self.write_reply(001, 'Resource already acquired by %s at %s' % (value['client_ip'],
                                                                              value['datetime']))
-            raise TerminateConnectionException()
-        self.key = key
+            return
+        self.locks.append(key)
         self.storage.set(key, { "client_ip": self.addr[0],
                                 "version": self.version,
                                 "datetime": datetime.datetime.now() })
         self.write_reply(000, 'OK')
-        self.method = 'nop'
 
-    def nop(self, value):
-        pass
+    def del_lock(self, key):
+        if not key:
+            self.write_reply(002, 'Empty resource key')
+            return
+        if key not in self.locks:
+            self.write_reply(004, 'Not a previously acquired resource')
+            return
+        self.locks.remove(key)
+        self.storage.remove(key)
+        self.write_reply(000, 'OK')
 
+    # data is ready for receiving from server
     def read(self, data):
         self.rbuf += data
         lines = self.rbuf.split('\n')
@@ -66,12 +85,15 @@ class Connection:
                 method(line.strip())
             self.rbuf = lines[-1]
 
+    # send data to server
     def write(self, data):
         self.socket.send(data)
 
+    # connection closed
     def close(self):
-        if self.key:
-            self.storage.remove(self.key)
+        for key in self.locks:
+            self.storage.remove(key)
+        self.locks = []
 
 class Server:
     listen_backlog = 2
@@ -86,6 +108,7 @@ class Server:
     def start(self):
         self.server_socket = socket.socket()
         self.server_socket.setblocking(0) # non-blocking
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.addr, self.port))
         self.server_socket.listen(self.listen_backlog)
 
