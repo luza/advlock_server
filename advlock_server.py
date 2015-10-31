@@ -75,7 +75,7 @@ class Connection:
         self.storage.remove(key)
         self.write_reply(000, 'OK')
 
-    # data is ready for receiving from server
+    # Data is ready for receiving from server
     def read(self, data):
         self.rbuf += data
         lines = self.rbuf.split('\n')
@@ -85,11 +85,11 @@ class Connection:
                 method(line.strip())
             self.rbuf = lines[-1]
 
-    # send data to server
+    # Send data to server
     def write(self, data):
         self.socket.send(data)
 
-    # connection closed
+    # Connection closed
     def close(self):
         for key in self.locks:
             self.storage.remove(key)
@@ -107,7 +107,7 @@ class Server:
 
     def start(self):
         self.server_socket = socket.socket()
-        self.server_socket.setblocking(0) # non-blocking
+        self.server_socket.setblocking(0) # Non-blocking
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.addr, self.port))
         self.server_socket.listen(self.listen_backlog)
@@ -124,7 +124,7 @@ class Server:
         rlist = [self.server_socket] + self.connection_objects.keys()
         rlist, wlist, xlist = select.select(rlist, [], [])
 
-        # check for connections ready to be accepted
+        # Check for connections ready to be accepted
         if self.server_socket in rlist:
             rlist.remove(self.server_socket)
             client_socket, addr = self.server_socket.accept()
@@ -133,7 +133,7 @@ class Server:
                                                                     client_socket,
                                                                     addr)
 
-        # processing reading events
+        # Processing reading events
         for client_socket in rlist:
             try:
                 self.process_reading_event(client_socket)
