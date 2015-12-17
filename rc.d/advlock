@@ -1,0 +1,31 @@
+#!/bin/sh
+# $FreeBSD$
+
+# PROVIDE: advlock
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+
+# Add the following lines to /etc/rc.conf to enable advlock:
+# advlock_enable (bool): Set to YES to enable advlock
+#                        Default: NO
+# advlock_pidfile (str): Specify PID file
+#                        Default: /tmp/advlock_server.pid
+
+. /etc/rc.subr
+
+name="advlock"
+rcvar=advlock_enable
+
+command="/usr/local/opt/advlock_server/advlock_server_daemon.py"
+command_interpreter="python"
+
+load_rc_config $name
+
+: ${advlock_enable:="NO"}
+: ${advlock_pidfile="/tmp/advlock_server.pid"}
+
+pidfile=$advlock_pidfile
+PATH="${PATH}:/usr/local/bin"
+
+run_rc_command "$1"
+
