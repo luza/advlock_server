@@ -18,6 +18,9 @@ class KeysStorage:
     def get(self, key):
         return self.keys_storage[key] if key in self.keys_storage else None
 
+    def get_list(self):
+        return self.keys_storage
+
 class TerminateConnectionException(Exception):
     pass
 
@@ -32,7 +35,8 @@ class Connection:
         self.locks = []
         self.commands = {
             'set': self.set_lock,
-            'del': self.del_lock
+            'del': self.del_lock,
+            'list': self.list_locks
         }
 
     def write_reply(self, code, message):
@@ -40,9 +44,9 @@ class Connection:
 
     def set_version(self, version):
         self.version = version
-        self.method = 'set_or_del_lock'
+        self.method = 'run_command'
 
-    def set_or_del_lock(self, command):
+    def run_command(self, command):
         cmd, sep, key = command.partition(' ')
         if cmd in self.commands:
             self.commands[cmd](key)
@@ -59,7 +63,7 @@ class Connection:
                                                                              value['datetime']))
             return
         self.locks.append(key)
-        self.storage.set(key, { "client_ip": self.addr[0],
+        self.storage.set(key, { "client_ip": '%s:%s' % (self.addr[0], self.addr[1]),
                                 "version": self.version,
                                 "datetime": datetime.datetime.now() })
         self.write_reply(000, 'OK')
@@ -74,6 +78,12 @@ class Connection:
         self.locks.remove(key)
         self.storage.remove(key)
         self.write_reply(000, 'OK')
+
+    def list_locks(self, unused):
+        locks = self.storage.get_list()
+        self.write_reply(000, 'OK %d records' % len(locks))
+        for key, lock in locks.iteritems():
+            self.write('%s\t%s\t%s\t%s\n' % (key, lock['datetime'], lock['client_ip'], lock['version']))
 
     # Data is ready for receiving from server
     def read(self, data):
